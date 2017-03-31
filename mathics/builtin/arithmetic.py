@@ -1942,22 +1942,22 @@ class Subsets(Builtin):
     """
     <dl>
     <dt>'Subsets[$list$]'
-        <dd>finds a list of all posible subsets of $list$.
+        <dd>finds a list of all possible subsets of $list$.
         
     <dt>'Subsets[$list$, $n$]'
-        <dd>finds a list of all posible subsets containing at most $n$ elements.
+        <dd>finds a list of all possible subsets containing at most $n$ elements.
         
     <dt>'Subsets[$list$, {$n$}]'
-        <dd>finds a list of all posible subsets containing exactly $n$ elements.
+        <dd>finds a list of all possible subsets containing exactly $n$ elements.
         
     <dt>'Subsets[$list$, {$min$, $max$}]'
-        <dd>finds a list of all posible subsets containing between $min$ and $max$ elements.
+        <dd>finds a list of all possible subsets containing between $min$ and $max$ elements.
         
     <dt>'Subsets[$list$, $spec$, $n$]'
-        <dd>finds a list of the first %n% posible subsets.
+        <dd>finds a list of the first %n% possible subsets.
         
     <dt>'Subsets[$list$, $spec$, {$n$}]'
-        <dd>finds the %n%th posible subset.
+        <dd>finds the %n%th possible subset.
     </dl>
     >> Subsets[{a, b, c}]
      = {{}, {a}, {b}, {c}, {a, b}, {a, c}, {b, c}, {a, b, c}}
@@ -2015,6 +2015,10 @@ class Subsets(Builtin):
     #> Subsets[{a, b, c}, {a}]
      : Position 2 of Subsets[{a, b, c}, {a}] must be All, Infinity, a non-negative integer, or a List whose first element (required) is a non-negative integer, second element (optional) is a non-negative integer or Infinity, and third element (optional) is a nonzero integer
      = Subsets[{a, b, c}, {a}]
+    
+    #> Subsets[{a, b, c}, {}]
+     : Position 2 of Subsets[{a, b, c}, {}] must be All, Infinity, a non-negative integer, or a List whose first element (required) is a non-negative integer, second element (optional) is a non-negative integer or Infinity, and third element (optional) is a nonzero integer
+     = Subsets[{a, b, c}, {}]
     """
 
     rules = {
@@ -2027,18 +2031,11 @@ class Subsets(Builtin):
     
     def apply(self, list, evaluation):
         'Subsets[list_?ListQ]'
-        tlist = [x for x in list.leaves]
-        expr = Expression('Subsets', list)
-        result = Expression('List')
-        tlen = len(tlist) 
-        for i in range(0, tlen + 1):
-            #for x in itertools.combinations(n_python):
-            # *[x for c in itertools.combinations(n_python, i) for x in c]
-            #for c in itertools.combinations(n_python, i):
-            for c in itertools.combinations(tlist, i):
-                nested_list = Expression('List', *[x for x in c])
-                result.leaves.append(nested_list)
-        return result
+#             #for x in itertools.combinations(n_python):
+#             # *[x for c in itertools.combinations(n_python, i) for x in c]
+#             #for c in itertools.combinations(n_python, i):
+    
+        return self.apply_1(list, Integer(len(list.to_python())), evaluation)
     
     def apply_1(self, list, n, evaluation):
         'Subsets[list_?ListQ, n_]'
@@ -2068,6 +2065,10 @@ class Subsets(Builtin):
             return evaluation.message('Subsets', 'nninfseq', expr)
         
         result = Expression('List')
+        
+        if n_len == 0:
+            return evaluation.message('Subsets', 'nninfseq', expr)
+        
         if n_len == 1:
             elem1 = n_python[0]
             if elem1 < 0 or not n.leaves[0].get_head_name() == "System`Integer":
