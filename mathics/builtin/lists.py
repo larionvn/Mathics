@@ -307,11 +307,11 @@ def set_sequence(list, indices):
                 raise PartDepthError
             try:
                 if pos > 0:
-                    cur.leaves[pos - 1] = Expression('Sequence', *cur.leaves[pos - 1].get_leaves())
+                    cur.leaves[pos - 1] = Expression('Sequence')
                 elif pos == 0:
                     cur.head = Symbol('Sequence')
                 else:
-                    cur.leaves[pos] = Expression('Sequence', *cur.leaves[pos].get_leaves())
+                    cur.leaves[pos] = Expression('Sequence')
             except IndexError:
                 raise PartRangeError
 
@@ -1184,6 +1184,9 @@ class Delete(Builtin):
     #> Delete[1 + x ^ (a + b + c), {2, 2, 3}]
      = 1 + x ^ (a + b)
 
+    #> Delete[f[a, g[b, c], d], {{2}, {2, 1}}]
+     = f[a, d]
+
     Delete without the position:
     #> Delete[{a, b, c, d}]
      : Delete called with 1 argument; 2 arguments are expected.
@@ -1215,7 +1218,7 @@ class Delete(Builtin):
 
     messages = {
         'argr': "Delete called with 1 argument; 2 arguments are expected.",
-        'argrx': "Delete called with `1` arguments; 2 arguments are expected.",
+        'argt': "Delete called with `1` arguments; 2 arguments are expected.",
         'partw': "Part `1` of `2` does not exist.",
         'psl': "Position specification `1` in `2` is not a machine-sized integer or a list of machine-sized integers.",
     }
@@ -1237,7 +1240,7 @@ class Delete(Builtin):
 
         positions = positions.get_sequence()
         if len(positions) > 1:
-            return evaluation.message('Delete', 'argrx', Integer(len(positions) + 1))
+            return evaluation.message('Delete', 'argt', Integer(len(positions) + 1))
         elif len(positions) == 0:
             return evaluation.message('Delete', 'argr')
 
@@ -1245,11 +1248,9 @@ class Delete(Builtin):
         if not positions.has_form('List', None):
             return evaluation.message('Delete', 'psl', positions, expr)
 
-        # For one position
-        positions = positions.leaves
-        first = positions[0]
-        if not first.has_form('List', None):
-            positions = [Expression('List', *positions)]
+        # Create new python list of the positions and sort it
+        positions = [l for l in positions.leaves] if positions.leaves[0].has_form('List', None) else [positions]
+        positions.sort(key=lambda e: e.get_sort_key(pattern_sort=True))
 
         new_expr = expr.copy()
         for position in positions:
