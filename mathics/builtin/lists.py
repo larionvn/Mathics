@@ -290,7 +290,7 @@ def set_sequence(list, indices):
         if len(rest) > 1:
             pos = rest[0]
             if cur.is_atom():
-                raise PartDepthError
+                raise PartDepthError(pos)
             try:
                 if pos > 0:
                     part = cur.leaves[pos - 1]
@@ -304,7 +304,7 @@ def set_sequence(list, indices):
         elif len(rest) == 1:
             pos = rest[0]
             if cur.is_atom():
-                raise PartDepthError
+                raise PartDepthError(pos)
             try:
                 if pos > 0:
                     cur.leaves[pos - 1] = Expression('Sequence')
@@ -1187,6 +1187,10 @@ class Delete(Builtin):
     #> Delete[f[a, g[b, c], d], {{2}, {2, 1}}]
      = f[a, d]
 
+    #> Delete[f[a, g[b, c], d], m + n]
+     : The expression m + n cannot be used as a part specification. Use Key[m + n] instead.
+     = Delete[f[a, g[b, c], d], m + n]
+
     Delete without the position:
     #> Delete[{a, b, c, d}]
      : Delete called with 1 argument; 2 arguments are expected.
@@ -1202,17 +1206,21 @@ class Delete(Builtin):
      : Part {5} of {a, b, c, d} does not exist.
      = Delete[{a, b, c, d}, 5]
 
+    #> Delete[{a, b, c, d}, {1, 2}]
+     : Part 2 of {a, b, c, d} does not exist.
+     = Delete[{a, b, c, d}, {1, 2}]
+
     Delete the position not integer:
     #> Delete[{a, b, c, d}, {1, n}]
-     : Position specification {1, n} in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
+     : Position specification n in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
      = Delete[{a, b, c, d}, {1, n}]
 
     #> Delete[{a, b, c, d}, {{1}, n}]
-     : Position specification n in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
+     : Position specification {n, {1}} in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
      = Delete[{a, b, c, d}, {{1}, n}]
 
     #> Delete[{a, b, c, d}, {{1}, {n}}]
-     :  Position specification {n} in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
+     : Position specification n in {a, b, c, d} is not a machine-sized integer or a list of machine-sized integers.
      = Delete[{a, b, c, d}, {{1}, {n}}]
     """
 
@@ -1221,6 +1229,7 @@ class Delete(Builtin):
         'argt': "Delete called with `1` arguments; 2 arguments are expected.",
         'partw': "Part `1` of `2` does not exist.",
         'psl': "Position specification `1` in `2` is not a machine-sized integer or a list of machine-sized integers.",
+        'pkspec': "The expression `1` cannot be used as a part specification. Use `2` instead.",
     }
 
     def apply_one(self, expr, position, evaluation):
@@ -1246,7 +1255,7 @@ class Delete(Builtin):
 
         positions = positions[0]
         if not positions.has_form('List', None):
-            return evaluation.message('Delete', 'psl', positions, expr)
+            return evaluation.message('Delete', 'pkspec', positions, Expression('Key', positions))
 
         # Create new python list of the positions and sort it
         positions = [l for l in positions.leaves] if positions.leaves[0].has_form('List', None) else [positions]
@@ -1255,10 +1264,14 @@ class Delete(Builtin):
         new_expr = expr.copy()
         for position in positions:
             pos = [p.get_int_value() for p in position.get_leaves()]
-            if None in pos or len(pos) == 0:
-                return evaluation.message('Delete', 'psl', position, expr)
+            if None in pos:
+                return evaluation.message('Delete', 'psl', position.leaves[pos.index(None)], expr)
+            if len(pos) == 0:
+                return evaluation.message('Delete', 'psl', Expression('List', *positions), expr)
             try:
                 set_sequence(new_expr, pos)
+            except PartDepthError as exc:
+                return evaluation.message('Delete', 'partw', Integer(exc.index), expr)
             except PartError:
                 return evaluation.message('Delete', 'partw', Expression('List', *pos), expr)
 
