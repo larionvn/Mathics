@@ -4890,3 +4890,72 @@ class ContainsOnly(Builtin):
                 return Symbol('False')
 
         return Symbol('True')
+
+
+class Association(Builtin):
+    """
+    <dl>
+    <dt>'Association[$key1$ -> $val1$, $key2$ -> $val2$, ...]'
+    <dt>'<|$key1$ -> $val1$, $key2$ -> $val2$, ...|>'
+        <dd>represents a association between keys and values.
+    </dl>
+
+    'Association' is the head of associations:
+    >> Head[<|a -> x, b -> y, c -> z|>]
+     = Association
+
+    >> <|a -> x, b -> y|>
+     = <|a -> x, b -> y|>
+
+    >> Association[{a -> x, b -> y}]
+     = <|a -> x, b -> y|>
+
+    Associations can be nested:
+    #> <|a -> x, b -> y, <|a -> z, d -> t|>|>
+     = <|a -> z, b -> y, d -> t|>
+
+    #> <|a -> x, b -> y, c -> <|d -> t|>|>
+     = <|a -> x, b -> y, c -> <|d -> t|>|>
+
+    #> <|a -> x, b + c -> y, {<|{}|>, a -> {z}}|>
+     = <|a -> {z}, b + c -> y|>
+
+    #> <|"x" -> 1, {y} -> 1|>
+     = <|x -> 1, {y} -> 1|>
+
+    #> <|a, b -> y|>
+    = Association[a, b -> y]
+
+    #> <|a -> x, b -> y, c -> <|d -> t|>|> // ToBoxes
+     = RowBox[{<|, RowBox[{RowBox[{a, ->, x}], ,, RowBox[{b, ->, y}], ,, RowBox[{c, ->, RowBox[{<|, RowBox[{d, ->, t}], |>}]}]}], |>}]
+
+    #> Association[a -> x, b -> y, c -> Association[d -> t, Association[e -> u]]] // ToBoxes
+     = RowBox[{<|, RowBox[{RowBox[{a, ->, x}], ,, RowBox[{b, ->, y}], ,, RowBox[{c, ->, RowBox[{<|, RowBox[{RowBox[{d, ->, t}], ,, RowBox[{e, ->, u}]}], |>}]}]}], |>}]
+    """
+
+    attributes = ('HoldAllComplete', 'Protected',)
+
+    def apply_makeboxes(self, rules, f, evaluation):
+        '''MakeBoxes[<|rules___|>,
+            f:StandardForm|TraditionalForm|OutputForm|InputForm]'''
+
+        def make_flatten(exprs, dic={}, keys=[]):
+            for expr in exprs:
+                if expr.has_form('Rule', 2):
+                    key = expr.leaves[0]
+                    dic[key] = expr
+                    if key not in keys:
+                        keys.append(key)
+                elif expr.has_form('List', None) or expr.has_form('Association', None):
+                    make_flatten(expr.leaves, dic, keys)
+                else:
+                    raise
+            return [dic[key] for key in keys]
+
+        rules = rules.get_sequence()
+        try:
+            rules = make_flatten(rules)
+        except:
+            return Expression('RowBox', Expression('List', 'Association', *list_boxes(rules, f, "[", "]")))
+
+        return Expression('RowBox', Expression('List', *list_boxes(rules, f, "<|", "|>")))
