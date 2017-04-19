@@ -223,30 +223,38 @@ class Unique(Predefined):
     Create a unique symbol with no particular name:
     >> Unique[]
      = $1
+
     >> Unique[sym]
      = sym$1
+
     Create a unique symbol whose name begins with x:
     >> Unique["x"]
      = x2
 
     #> Unique[]
      = $3
+
     #> Unique[{x, x}]
      = {x$2, x$3}
     Each use of Unique[symbol] increments $ModuleNumber:
+
     #> {$ModuleNumber, Unique[x], $ModuleNumber}
      = {4, x$4, 5}
     Unique[symbol] creates symbols in the same way Module does:
+
     #> {Module[{x}, x], Unique[x]}
      = {x$5, x$6}
     Unique with more arguments
+
     #> Unique[x, y]
      :  Unique called with 2 arguments; 0 or 1 argument are expected.
      = Unique[x, y]
     Unique call without symbol argument
+
     #> Unique[x + y]
      : x + y is not a symbol or a valid symbol name.
      = Unique[x + y]
+
     #> Unique[1]
      : 1 is not a symbol or a valid symbol name.
      = Unique[1]
