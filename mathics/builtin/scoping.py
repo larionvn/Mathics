@@ -271,7 +271,7 @@ class Unique(Predefined):
         from mathics.core.parser import is_symbol_name
 
         vars = vars.get_sequence()
-        if len(vars) > 1:
+        if len(vars) > 2:
             return evaluation.message('Unique', 'argrx', Integer(len(vars)))
 
         text = '$' if len(vars) == 0 else vars[0].get_string_value()
