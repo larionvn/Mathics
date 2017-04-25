@@ -1151,7 +1151,6 @@ class StringForm(Builtin):
             result.append(String(s[pos:]))
         return RowBox(Expression('List', *result))
 
-
 class Message(Builtin):
     """
     <dl>
@@ -1191,7 +1190,135 @@ def check_message(expr):
             return True
     return False
 
+class Check(Builtin):
+    """
+    <dl>
+    <dt>'Check[$expr$, $failexpr$]'
+        <dd>evaluates $expr$, and returns the result, unless messages were generated, in which case it evaluates and $failexpr$ will be returned.
+    <dt>'Check[$expr$, $failexpr$, {s1::t1,s2::t2,…}]'
+        <dd>checks only for the specified messages.
+    </dl>
+    
+    Return err when a message is generated:
+    >> Check[1/0, err]
+     : Infinite expression 1 / 0 encountered.
+     = err
+     
+    #> Check[1^0, err]
+     = 1
+     
+    Check only for specific messages: 
+    >> Check[Sin[0^0], err, Sin::argx]
+     : Indeterminate expression 0 ^ 0 encountered.
+     = Indeterminate
+     
+    >> Check[1/0, err, Power::infy]
+     : Infinite expression 1 / 0 encountered.
+     = err
+     
+    #> Check[1 + 2]
+     : Check called with 1 argument; 2 or more arguments are expected.
+     = Check[1 + 2]
+     
+    #> Check[1 + 2, err, 3 + 1]
+     : Message name 3 + 1 is not of the form symbol::name or symbol::name::language.
+     = Check[1 + 2, err, 3 + 1]
+     
+    #> Check[1 + 2, err, hello]
+     : Message name hello is not of the form symbol::name or symbol::name::language.
+     = Check[1 + 2, err, hello]
+      
+    #> Check[1/0, err, Compile::cpbool]
+     : Infinite expression 1 / 0 encountered.
+     = ComplexInfinity
+    
+    #> Check[{0^0, 1/0}, err]
+     : Indeterminate expression 0 ^ 0 encountered.
+     : Infinite expression 1 / 0 encountered.
+     = err
+    
+    #> Off[Power::infy]
+    #> Check[1 / 0, err]
+     = ComplexInfinity
+     
+    #> On[Power::infy]
+    #> Check[1 / 0, err]
+     : Infinite expression 1 / 0 encountered.
+     = err
+    """
 
+    attributes = ('HoldAll',)
+
+    messages = {
+        'argmu': 'Check called with 1 argument; 2 or more arguments are expected.',
+        'name': 'Message name `1` is not of the form symbol::name or symbol::name::language.',
+    }
+    
+    def apply_1_argument(self, expr, evaluation):
+        'Check[expr_]'
+        return evaluation.message('Check', 'argmu')
+    
+    def apply(self, expr, failexpr, params, evaluation):
+        'Check[expr_, failexpr_, params___]'
+        
+        #Todo: To implement the third form of this function , we need to implement the function $MessageGroups first          
+            #<dt>'Check[$expr$, $failexpr$, "name"]'
+               #<dd>checks only for messages in the named message group.
+               
+        def get_msg_list(expr):
+            if check_message(expr):
+                expr = Expression('List', expr)
+            
+            if expr.has_form('List', None):
+                messages = []
+                for item in expr.leaves:
+                    if check_message(item):
+                        messages.append(item)
+                    else:
+                        raise ValueError
+            else:
+                raise ValueError
+            return messages
+        
+        check_messages = set(evaluation.get_quiet_messages())
+        results = []
+        display_fail_expr =  False
+        
+        #Working with an expression or a list of expressions
+        if expr.has_form('List'):
+            exprs = [x for x in expr]
+        else:
+            exprs = [expr]
+        
+        params = params.get_sequence()    
+        if len(params) == 0:
+            for x in exprs:
+                result = x.evaluate(evaluation)
+                if(len(evaluation.out)):
+                    display_fail_expr = True
+                    #won't stop in the first check to continue showing as many messages as possible
+                else:
+                    results.append(result)
+        else:
+            for x in params:
+                try:
+                    msg = get_msg_list(x)
+                    for x in msg: 
+                        check_messages.add(x)
+                except ValueError:
+                    evaluation.message('Check', 'name', x)
+                    return
+            for x in exprs:
+                result = x.evaluate(evaluation)
+                out_len = len(evaluation.out)
+                if out_len:
+                    pattern = Expression('MessageName', Symbol(evaluation.out[out_len - 1].symbol), String(evaluation.out[out_len - 1].tag))
+                    if pattern in check_messages:
+                        display_fail_expr = True
+                        #won't stop in the first check to continue showing as many messages as possible
+                results.append(result)
+        return failexpr if display_fail_expr is True else Expression('List', *results) if len(results) > 1 else result
+    
 class Quiet(Builtin):
     """
     <dl>
