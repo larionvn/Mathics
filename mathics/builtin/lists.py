@@ -5010,6 +5010,9 @@ class Association(Builtin):
     #> %[c]
      = Association[a, b -> y][c]
 
+    #> <|a -> x, b -> y, <|a -> z, {c}|>, {}|>[a]
+    = Association[a -> x, b -> y, Association[a -> z, {c}], {}][a]
+
     #> <|a -> x, b -> y, c -> <|d -> t|>|> // ToBoxes
      = RowBox[{<|, RowBox[{RowBox[{a, ->, x}], ,, RowBox[{b, ->, y}], ,, RowBox[{c, ->, RowBox[{<|, RowBox[{d, ->, t}], |>}]}]}], |>}]
 
@@ -5022,6 +5025,27 @@ class Association(Builtin):
     def apply_makeboxes(self, rules, f, evaluation):
         '''MakeBoxes[<|rules___|>,
             f:StandardForm|TraditionalForm|OutputForm|InputForm]'''
+
+        def check_valid(exprs):
+            for expr in exprs:
+                if expr.has_form('Rule', 2):
+                    pass
+                elif expr.has_form('List', None) or expr.has_form('Association', None):
+                    check_valid(expr.leaves)
+                else:
+                    raise
+
+        rules = rules.get_sequence()
+        try:
+            check_valid(rules)
+        except:
+            symbol = Expression('MakeBoxes', Symbol('Association'), f)
+            return Expression('RowBox', Expression('List', symbol, *list_boxes(rules, f, "[", "]")))
+
+        return Expression('RowBox', Expression('List', *list_boxes(rules, f, "<|", "|>")))
+
+    def apply(self, rules, evaluation):
+        'Association[rules__]'
 
         def make_flatten(exprs, dic={}, keys=[]):
             for expr in exprs:
@@ -5036,16 +5060,12 @@ class Association(Builtin):
                     raise
             return [dic[key] for key in keys]
 
-        rules = rules.get_sequence()
         try:
-            rules = make_flatten(rules)
+            return Expression('Association', *make_flatten(rules.get_sequence()))
         except:
-            symbol = Expression('MakeBoxes', Symbol('Association'), f)
-            return Expression('RowBox', Expression('List', symbol, *list_boxes(rules, f, "[", "]")))
+            return None
 
-        return Expression('RowBox', Expression('List', *list_boxes(rules, f, "<|", "|>")))
-
-    def apply(self, rules, key, evaluation):
+    def apply_key(self, rules, key, evaluation):
         'Association[rules__][key_]'
 
         def find_key(exprs, dic={}):
