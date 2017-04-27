@@ -4795,36 +4795,45 @@ class SubsetQ(Builtin):
     """
     <dl>
     <dt>'SubsetQ[$list1$, $list2$]'
-        <dd>yields True if $list2$ is a subset of $list1$, and False otherwise.
+        <dd>returns True if $list2$ is a subset of $list1$, and False otherwise.
     </dl>
 
     >> SubsetQ[{1, 2, 3}, {3, 1}]
      = True
+
     The empty list is a subset of every list:
     >> SubsetQ[{}, {}]
      = True
+
     >> SubsetQ[{1, 2, 3}, {}]
      = True
+
     Every list is a subset of itself:
     >> SubsetQ[{1, 2, 3}, {1, 2, 3}]
      = True
 
     #> SubsetQ[{1, 2, 3}, {0, 1}]
      = False
+
     #> SubsetQ[{1, 2, 3}, {1, 2, 3, 4}]
      = False
+
     #> SubsetQ[{1, 2, 3}]
      : SubsetQ called with 1 argument; 2 arguments are expected.
      = SubsetQ[{1, 2, 3}]
+
     #> SubsetQ[{1, 2, 3}, {1, 2}, {3}]
      : SubsetQ called with 3 arguments; 2 arguments are expected.
      = SubsetQ[{1, 2, 3}, {1, 2}, {3}]
+
     #> SubsetQ[a + b + c, {1}]
      : Heads Plus and List at positions 1 and 2 are expected to be the same.
      = SubsetQ[a + b + c, {1}]
+
     #> SubsetQ[{1, 2, 3}, n]
      : Nonatomic expression expected at position 2 in SubsetQ[{1, 2, 3}, n].
      = SubsetQ[{1, 2, 3}, n]
+
     #> SubsetQ[f[a, b, c], f[a]]
      = True
     """
