@@ -161,3 +161,9 @@ iso639_3 = {
     'Malaysian': 'zsm',
     'Zulu': 'zul',
 }
+
+unit_short_term = {
+    'Meters':'m',
+    "Centimeters":'cm',
+    'Kilogram':'kg',
+    }
