@@ -4929,13 +4929,16 @@ class Association(Builtin):
     #> %["x"]
      = 1
 
-    #> <|a, b -> y|>
-     = Association[a, b -> y]
-    #> %[c]
-     = Association[a, b -> y][c]
+    #> <|<|a -> v|> -> x, <|b -> y, a -> <|c -> z|>, {}, <||>|>, {d}|>[c]
+     =  Association[Association[a -> v] -> x, Association[b -> y, a -> Association[c -> z], {}, Association[]], {d}][c]
 
-    #> <|a -> x, b -> y, <|a -> z, {c}|>, {}|>[a]
-    = Association[a -> x, b -> y, Association[a -> z, {c}], {}][a]
+    #> <|<|a -> v|> -> x, <|b -> y, a -> <|c -> z|>, {d}|>, {}, <||>|>[a]
+     = Association[Association[a -> v] -> x, Association[b -> y, a -> Association[c -> z], {d}], {}, Association[]][a]
+
+    #> <|<|a -> v|> -> x, <|b -> y, a -> <|c -> z, {d}|>, {}, <||>|>, {}, <||>|>
+     = <|<|a -> v|> -> x, b -> y, a -> Association[c -> z, {d}]|>
+    #> %[a]
+     = Association[c -> z, {d}]
 
     #> <|a -> x, b -> y, c -> <|d -> t|>|> // ToBoxes
      = RowBox[{<|, RowBox[{RowBox[{a, ->, x}], ,, RowBox[{b, ->, y}], ,, RowBox[{c, ->, RowBox[{<|, RowBox[{d, ->, t}], |>}]}]}], |>}]
@@ -4944,38 +4947,47 @@ class Association(Builtin):
      = RowBox[{<|, RowBox[{RowBox[{a, ->, x}], ,, RowBox[{b, ->, y}], ,, RowBox[{c, ->, RowBox[{<|, RowBox[{RowBox[{d, ->, t}], ,, RowBox[{e, ->, u}]}], |>}]}]}], |>}]
     """
 
+    error_idx = 0
+
     attributes = ('HoldAllComplete', 'Protected',)
 
     def apply_makeboxes(self, rules, f, evaluation):
         '''MakeBoxes[<|rules___|>,
             f:StandardForm|TraditionalForm|OutputForm|InputForm]'''
 
-        def check_valid(exprs):
+        def validate(exprs):
             for expr in exprs:
-                if expr.has_form('Rule', 2):
+                if expr.has_form(('Rule', 'RuleDelayed'), 2):
                     pass
                 elif expr.has_form('List', None) or expr.has_form('Association', None):
-                    check_valid(expr.leaves)
+                    if validate(expr.leaves) is not True:
+                        return False
                 else:
-                    raise
+                    return False
+            return True
 
         rules = rules.get_sequence()
-        try:
-            check_valid(rules)
-        except:
+        if self.error_idx == 0 and validate(rules) is True:
+            expr = Expression('RowBox', Expression('List', *list_boxes(rules, f, "<|", "|>")))
+        else:
+            self.error_idx += 1
             symbol = Expression('MakeBoxes', Symbol('Association'), f)
-            return Expression('RowBox', Expression('List', symbol, *list_boxes(rules, f, "[", "]")))
+            expr = Expression('RowBox', Expression('List', symbol, *list_boxes(rules, f, "[", "]")))
 
-        return Expression('RowBox', Expression('List', *list_boxes(rules, f, "<|", "|>")))
+        expr = expr.evaluate(evaluation)
+        if self.error_idx > 0:
+            self.error_idx -= 1
+        return expr
 
     def apply(self, rules, evaluation):
         'Association[rules__]'
 
         def make_flatten(exprs, dic={}, keys=[]):
             for expr in exprs:
-                if expr.has_form('Rule', 2):
-                    key = expr.leaves[0]
-                    dic[key] = expr
+                if expr.has_form(('Rule', 'RuleDelayed'), 2):
+                    key = expr.leaves[0].evaluate(evaluation)
+                    value = expr.leaves[1].evaluate(evaluation)
+                    dic[key] = Expression(expr.get_head(), key, value)
                     if key not in keys:
                         keys.append(key)
                 elif expr.has_form('List', None) or expr.has_form('Association', None):
@@ -4994,7 +5006,7 @@ class Association(Builtin):
 
         def find_key(exprs, dic={}):
             for expr in exprs:
-                if expr.has_form('Rule', 2):
+                if expr.has_form(('Rule', 'RuleDelayed'), 2):
                     if expr.leaves[0] == key:
                         dic[key] = expr.leaves[1]
                 elif expr.has_form('List', None) or expr.has_form('Association', None):
