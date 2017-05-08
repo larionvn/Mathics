@@ -5097,3 +5097,32 @@ class Association(Builtin):
             return None
 
         return result[key] if result else Expression('Missing', Symbol('KeyAbsent'), key)
+
+
+class AssociationQ(Test):
+    """
+    <dl>
+    <dt>'AssociationQ[$expr$]'
+        <dd>return True if $expr$ is a valid Association object, and False otherwise.
+    </dl>
+
+    >> AssociationQ[<|a -> 1, b :> 2|>]
+     = True
+
+    >> AssociationQ[<|a, b|>]
+     = False
+    """
+
+    def test(self, expr):
+        def validate(leaves):
+            for leaf in leaves:
+                if leaf.has_form(('Rule', 'RuleDelayed'), 2):
+                    pass
+                elif leaf.has_form('List', None) or leaf.has_form('Association', None):
+                    if validate(leaf.leaves) is not True:
+                        return False
+                else:
+                    return False
+            return True
+
+        return expr.get_head_name() == 'System`Association' and validate(expr.leaves)
