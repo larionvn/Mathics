@@ -5170,6 +5170,14 @@ class Keys(Builtin):
      : The argument Association[a -> x, Association[a -> y, b]] is not a valid Association or a list of rules.
      = Keys[Association[a -> x, Association[a -> y, b]]]
 
+    #> Keys[<|a -> x, {a -> y, b}|>]
+     : The argument Association[a -> x, {a -> y, b}] is not a valid Association or a list of rules.
+     = Keys[Association[a -> x, {a -> y, b}]]
+
+    #> Keys[{a -> x, <|a -> y, b|>}]
+     : The argument Association[a -> y, b] is not a valid Association or a list of rules.
+     = Keys[{a -> x, Association[a -> y, b]}]
+
     #> Keys[{a -> x, {a -> y, b}}]
      : The argument b is not a valid Association or a list of rules.
      = Keys[{a -> x, {a -> y, b}}]
@@ -5187,14 +5195,13 @@ class Keys(Builtin):
     }
 
     def apply(self, rules, evaluation):
-        'Keys[rules__]'
+        'Keys[rules___]'
 
         def get_keys(expr):
             if expr.has_form(('Rule', 'RuleDelayed'), 2):
                 return expr.leaves[0]
-            elif expr.has_form('List', None):
-                return Expression('List', *[get_keys(leaf) for leaf in expr.leaves])
-            elif expr.has_form('Association', None) and AssociationQ(expr).evaluate(evaluation) == Symbol('True'):
+            elif expr.has_form('List', None) \
+                    or (expr.has_form('Association', None) and AssociationQ(expr).evaluate(evaluation) == Symbol('True')):
                 return Expression('List', *[get_keys(leaf) for leaf in expr.leaves])
             else:
                 evaluation.message('Keys', 'invrl', expr)
