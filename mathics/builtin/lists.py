@@ -5096,7 +5096,7 @@ class Association(Builtin):
         except:
             return None
 
-        return result[key] if result else Expression('Missing', Symbol('KeyAbsent'), key)
+        return result[key] if result else Expression('Missing', String('KeyAbsent'), key)
 
 
 class AssociationQ(Test):
@@ -5303,3 +5303,180 @@ class Values(Builtin):
             return get_values(rules[0])
         except:
             return evaluation.message('Values', 'invrl', rules[0])
+
+
+class Key(Builtin):
+    """
+    <dl>
+    <dt>'Key[$key$]'
+        <dd>represents a key used to access a value in an association.
+    <dt>'Key[$key$][$assoc$]'
+        <dd>extracts the value corresponding to $key$ in the association $assoc$.
+    </dl>
+
+    >> Key[a][<|a -> x, b -> y|>]
+     = x
+
+    >> Key[c][<|a -> x, b -> y|>]
+     = Missing[KeyAbsent, c]
+    """
+
+    attributes = ('Protected',)
+
+    rules = {
+        'Key[key_][assoc_?AssociationQ]': 'assoc @ key',
+    }
+
+
+class Lookup(Builtin):
+    """
+    <dl>
+    <dt>'Lookup[$assoc$, $key$]'
+        <dd>looks up the value associated with $key$ in the association $assoc$; if the key is not present, Missing["KeyAbsent", $key$] is returned.
+    <dt>'Lookup[$assoc$, {$key1$, $key2$, ...}]'
+        <dd>gives a list of the values associated with the $keyi$.
+    <dt>'Lookup[{$assoc1$, $assoc2$, ...}, $key$]'
+        <dd>gives a list corresponding to the value of $key$ in each $associ$.
+    <dt>'Lookup[$assoc$, $key$, $default$]'
+        <dd>gives $default$ if the $key$ is not present.
+    <dt>'Lookup[$key$]'
+        <dd>represents an operator form of Lookup that can be applied to an expression.
+    </dl>
+
+    >> Lookup[<|a -> x, b -> y|>, a]
+     = x
+
+    >> Lookup[{a -> x, b -> y}, b]
+     = y
+
+    >> Lookup[<|a -> x, b -> y|>, c]
+     = Missing[KeyAbsent, c]
+
+    >> Lookup[<|a -> x, b -> y|>, c, z]
+     = z
+
+    >> Lookup[<|a -> x, b -> y|>, b, Print["missing"]]
+     = y
+
+    >> Lookup[a]@ <|a -> 1|>
+     = 1
+
+    #> Lookup[a -> x, a]
+     = x
+
+    #> Lookup[{a -> x, a -> y, {a -> z, {b -> t}, {}}}, a]
+     : The argument {a -> x, a -> y, {a -> z, {b -> t}, {}}} is not a valid Association or a list of rules.
+     = Lookup[{a -> x, a -> y, {a -> z, {b -> t}, {}}}, a]
+
+    #> Lookup[<|a -> x, a -> y, {a -> z, {b -> t}, <||>, {}}|>, Key[a]]
+     = z
+
+    #> Lookup[<|a -> x, a -> y, {a -> z, {b -> t}, <||>, {}}|>, {a, b, c}]
+     = {z, t, Missing[KeyAbsent, c]}
+
+    #> Lookup[<|a -> x, a -> y, {a -> z, {b -> t}, <||>, {}}|>, {a, b, c}, w]
+     = {z, t, w}
+
+    #> Lookup[<|a -> x, a -> y, {a -> z, {b -> t}, <||>, {}}|>, {}, w]
+     = {}
+
+    #> Lookup[{{a -> x, b -> y}, {w -> z, {}}}, a, m]
+     : The argument {{a -> x, b -> y}, {w -> z, {}}} is not a valid rule.
+     = Lookup[{{a -> x, b -> y}, {w -> z, {}}}, a, m]
+
+    #> Lookup[{<|a -> x, b -> y|>, {w -> z, {}}}, Key[w]]
+     = {Missing[KeyAbsent, w], z}
+
+    #> Lookup[<|a -> x, <|a -> y, b|>|>, a, m]
+     : The argument Association[a -> x, Association[a -> y, b]] is not a valid Association or a list of rules.
+     = Lookup[Association[a -> x, Association[a -> y, b]], a, m]
+
+    #> Lookup[<|a -> x, {a -> y, b}|>, a, m]
+     : The argument Association[a -> x, {a -> y, b}] is not a valid Association or a list of rules.
+     = Lookup[Association[a -> x, {a -> y, b}], a, m]
+
+    #> Lookup[{a -> x, <|a -> y, b|>}, a, m]
+     : The argument {a -> x, Association[a -> y, b]} is not a valid Association or a list of rules.
+     = Lookup[{a -> x, Association[a -> y, b]}, a, m]
+
+    #> Lookup[{a -> x, {a -> y, b}}, a, m]
+     : The argument {a -> x, {a -> y, b}} is not a valid Association or a list of rules.
+     = Lookup[{a -> x, {a -> y, b}}, a, m]
+
+    #> Lookup[a -> x, b -> y, a, m]
+     : Lookup called with 4 arguments; 2 or 3 arguments are expected.
+     = Lookup[a -> x, b -> y, a, m]
+    """
+
+    attributes = ('HoldAllComplete', 'Protected',)
+
+    messages = {
+        'argt': 'Lookup called with `1` arguments; 2 or 3 arguments are expected.',
+        'invrl': 'The argument `1` is not a valid Association or a list of rules.',
+        'invrk': 'The argument `1` is not a valid rule.',
+    }
+
+    rules = {
+        'Lookup[assoc_, list_?ListQ]': 'Lookup[assoc, #]& /@ list',
+        'Lookup[assoc_, list_?ListQ, default_]': 'Lookup[assoc, #, default]& /@ list',
+        'Lookup[key_][assoc_]': 'Lookup[assoc, key]',
+    }
+
+    def apply(self, assoc, key, default, evaluation):
+        'Lookup[assoc_, key_, default___]'
+
+        def find_values(exprs, is_assoc):
+            def find_value_in_rules(rules, allow_list):
+                value = None
+                for rule in rules:
+                    if rule.has_form(('Rule', 'RuleDelayed'), 2):
+                        if rule.leaves[0] == key and value is None:
+                            value = rule.leaves[1]
+                    elif allow_list and rule.has_form('List', None):
+                        # List is allowed if the value is exist
+                        if value is None:
+                            raise SyntaxError
+                        else:
+                            pass
+                    else:
+                        raise
+                return default if value is None else value
+
+            try:
+                return find_value_in_rules(exprs, False)
+            except:
+                pass
+
+            if not is_assoc:
+                try:
+                    if any(not expr.has_form('List', None) and not expr.has_form('Association', None) for expr in exprs):
+                        raise
+                    return Expression('List', *[find_value_in_rules(expr.leaves, True) for expr in exprs])
+                except SyntaxError:
+                    return evaluation.message('Lookup', 'invrk', assoc)
+                except:
+                    return evaluation.message('Lookup', 'invrl', assoc)
+
+        # Extract the correct key
+        if key.has_form('Key', 1):
+            key = key.leaves[0]
+
+        # Check number of arguments
+        default = default.get_sequence()
+        if len(default) == 0:
+            default = Expression('Missing', String('KeyAbsent'), key)
+        elif len(default) == 1:
+            default = default[0]
+        else:
+            return evaluation.message('Lookup', 'argt', Integer(len(default) + 2))
+
+        assoc = assoc.evaluate(evaluation)
+        # Check for Rule or RuleDelayed
+        if assoc.has_form(('Rule', 'RuleDelayed'), 2):
+            return assoc.leaves[1] if assoc.leaves[0] == key else default
+        elif assoc.has_form('List', None):
+            return find_values(assoc.leaves, False)
+        elif AssociationQ(assoc).evaluate(evaluation) == Symbol('True'):
+            return find_values(assoc.leaves, True)
+        else:
+            return evaluation.message('Lookup', 'invrl', assoc)
