@@ -1237,6 +1237,15 @@ class Check(Builtin):
      : Infinite expression 1 / 0 encountered.
      = err
     
+    #> Check[0^0/0, err, Power::indet]
+     : Indeterminate expression 0 ^ 0 encountered.
+     : Infinite expression 1 / 0 encountered.
+     = err
+    #> Check[{0^0, 3/0}, err, Power::indet]
+     : Indeterminate expression 0 ^ 0 encountered.
+     : Infinite expression 1 / 0 encountered.
+     = err
+ 
     #> Off[Power::infy]
     #> Check[1 / 0, err]
      = ComplexInfinity
@@ -1283,22 +1292,14 @@ class Check(Builtin):
         check_messages = set(evaluation.get_quiet_messages())
         results = []
         display_fail_expr =  False
-        
-        #Working with an expression or a list of expressions
-        if expr.has_form('List'):
-            exprs = [x for x in expr]
-        else:
-            exprs = [expr]
-        
+
         params = params.get_sequence()    
         if len(params) == 0:
-            for x in exprs:
-                result = x.evaluate(evaluation)
-                if(len(evaluation.out)):
-                    display_fail_expr = True
-                    #won't stop in the first check to continue showing as many messages as possible
-                else:
-                    results.append(result)
+            result = expr.evaluate(evaluation)
+            if(len(evaluation.out)):
+                display_fail_expr = True
+            else:
+                results.append(result)
         else:
             for x in params:
                 try:
@@ -1308,15 +1309,16 @@ class Check(Builtin):
                 except ValueError:
                     evaluation.message('Check', 'name', x)
                     return
-            for x in exprs:
-                result = x.evaluate(evaluation)
-                out_len = len(evaluation.out)
-                if out_len:
-                    pattern = Expression('MessageName', Symbol(evaluation.out[out_len - 1].symbol), String(evaluation.out[out_len - 1].tag))
+               
+            result = expr.evaluate(evaluation)
+            out_len = len(evaluation.out)
+            if out_len:
+                for i in range(out_len):
+                    pattern = Expression('MessageName', Symbol(evaluation.out[out_len - i - 1].symbol), String(evaluation.out[out_len - i - 1].tag))
                     if pattern in check_messages:
                         display_fail_expr = True
-                        #won't stop in the first check to continue showing as many messages as possible
-                results.append(result)
+                        break
+            results.append(result)
         return failexpr if display_fail_expr is True else Expression('List', *results) if len(results) > 1 else result
     
 class Quiet(Builtin):
