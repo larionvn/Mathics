@@ -1,7 +1,7 @@
 from mathics.builtin.base import Builtin, MessageException
 from mathics.builtin.randomnumbers import RandomEnv
 from mathics.builtin.codetables import unit_short_term
-from mathics.builtin.strings import to_regex, anchor_pattern
+from mathics.builtin.strings import to_regex, anchor_pattern, ToLowerCase
 from mathics.core.expression import Expression, String, Integer, Real, Symbol, strip_context
 
 import os
@@ -27,7 +27,7 @@ class Quantity(Builtin):
     >> Quantity[10, "Meters"]
      = 10 meters
      
-    >> Quantity[{10,20}, "Meters"
+    >> Quantity[{10,20}, "Meters"]
      = {10 meters, 20 meters}
     
     #> Quantity[10, Meters]
@@ -53,12 +53,12 @@ class Quantity(Builtin):
         pass
 
     def apply_makeboxes(self, mag, unit, f, evaluation):
-        'MakeBoxes[Quantity[mag_, unit_], f:StandardForm|TraditionalForm|OutputForm|InputForm]'
+        'MakeBoxes[Quantity[mag_, unit_String], f:StandardForm|TraditionalForm|OutputForm|InputForm]'
 
         if not (self.validate()):
             print("hello")
             return Expression(
-                'RowBox', Expression('List', mag, " ", unit))
+                'RowBox', Expression('List', mag, " ", unit.get_string_value().lower()))
         else:
             print("aaaa")
             return Expression(
@@ -66,12 +66,12 @@ class Quantity(Builtin):
 
     def apply_n(self, mag, unit, evaluation):
         'Quantity[mag_, unit_?StringQ]'
-        expr =  Expression('Quantity', 1, "Meter")
+        expr =  Expression('Quantity', mag, unit)
         if (1): 
             print("going...")
             return expr
         
-class QuantityQ(Test):
+class QuantityQ(Builtin):
     """
     <dl>
     <dt>'QuantityQ[$expr$]'
