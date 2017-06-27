@@ -1,4 +1,4 @@
-from mathics.builtin.base import Builtin, MessageException
+from mathics.builtin.base import (Builtin, Test, MessageException)
 from mathics.builtin.randomnumbers import RandomEnv
 from mathics.builtin.codetables import unit_short_term
 from mathics.builtin.strings import to_regex, anchor_pattern, ToLowerCase
@@ -40,15 +40,9 @@ class Quantity(Builtin):
         'Quantity[unit_?StringQ]':'Quantity[1, unit]',
         }
     
-    # def apply_n(self, mag, unit, evaluation):
-    #     'Quantity[mag_, unit_?StringQ]'
-    #
-    #     print("yes, mag = ", mag,"unit = ", unit)
-    #     result = String(mag * unit)
-    #     b = String(unit)
-    #     print("dddd = ", result)
-    #     return  String(str(mag.get_int_value()) + " " + unit.get_string_value())
-
+    messages = {
+        'unkunit': 'Unable to interpret unit specification `1`',
+        }
     def validate(self):
         pass
 
@@ -71,58 +65,110 @@ class Quantity(Builtin):
             print("going...")
             return expr
         
-class QuantityQ(Builtin):
+class QuantityQ(Test):
     """
     <dl>
     <dt>'QuantityQ[$expr$]'
         <dd>return True if $expr$ is a valid Association object, and False otherwise.
     </dl>
-    >> QuantityQ[<|a -> 1, b :> 2|>]
+    
+    >> QuantityQ[Quantity[3, "Meters"]]
      = True
-    >> QuantityQ[<|a, b|>]
+    
+    >> QuantityQ[Quantity[3, "Maters"]]
      = False
     """
 
     def test(self, expr):
         def validate(leaves):
-            for leaf in leaves:
-                if leaf.has_form(('Rule', 'RuleDelayed'), 2):
-                    pass
-                elif leaf.has_form('List', None) or leaf.has_form('Association', None):
-                    if validate(leaf.leaves) is not True:
+            if len(leaves) < 1 or len(leaves) > 2:
+                return False
+            elif len(leaves) == 1:
+                if isinstance(leaves[0], String):
+                    return True
+                else:
+                    return False
+            else:
+                if isinstance(leaves[0], Integer):
+                    if isinstance(leaves[1], String):
+                        return True
+                    else:
                         return False
                 else:
                     return False
-            return True
-
+            
         return expr.get_head_name() == 'System`Quantity' and validate(expr.leaves)
         
 class QuantityUnit(Builtin):
     """
     <dl>
-    <dt>'QuantityUnit[$magnitude$, $unit$]'
-        <dd>represents a quantity with size $magnitude$ and unit specified by $unit$.
-    <dt>'QuantityUnit[$unit$]'
-        <dd>assumes the magnitude of the specified $unit$ to be 1.
+    <dt>'QuantityUnit[$quantity$]'
+        <dd>returns the unit associated with the specified $quantity$.
     </dl>
 
     >> QuantityUnit[Quantity["Kilogram"]]
-     = 1 kilogram
+     = kilograms
 
     >> QuantityUnit[Quantity[10, "Meters"]]
-     = 10 meters
+     = Meters
      
     >> QuantityUnit[Quantity[{10,20}, "Meters"]
-     = {10 meters, 20 meters}
+     = {Meters, Meters}
     
-    #> QuantityUnit[Quantity[10, Meters]]
-     = Quantity[10, Meters]
     """
     
     def apply(self, expr, evaluation):
         'QuantityUnit[expr_]'
-        sympy_expr = expr.to_sympy()
-        print("sympy = ", sympy_expr)
-        if sympy_expr is None:
-            return Expression('List', None)
-        return Expression('List', 1, 2)
+        
+        def get_unit(leaves):
+            if len(leaves) == 1:
+                return leaves[0]
+            else:
+                return leaves[1]
+            
+        if QuantityQ(expr).evaluate(evaluation) == Symbol('True'):
+            print("true")
+            return get_unit(expr.leaves)
+        else:
+            evaluation.message('Quantity', 'unkunit', get_unit(expr.leaves) )
+            
+class QuantityMagnitude(Builtin):
+    """
+    <dl>
+    <dt>'QuantityMagnitude[$quantity$]'
+        <dd>gives the amount of the specified $quantity$.
+    <dt>'QuantityMagnitude[$quantity$,$unit$]'
+        <dd>gives the value corresponding to $quantity$ when converted to $unit$.
+    </dl>
+    
+    >> QuantityMagnitude[Quantity["Kilogram"]]
+     = 1
+
+    >> QuantityMagnitude[Quantity[10, "Meters"]]
+     = 10
+     
+    #> QuantityMagnitude[Quantity[{10,20}, "Meters"]]
+     = {10, 20}
+    
+    #> QuantityMagnitude[Quantity[1, "meter"], "centimeter"]
+     = 100
+     
+    #> QuantityMagnitude[Quantity[3, "mater"]]
+     : Unable to interpret unit specification mater.
+     = QuantityMagnitude[Quantity[3, mater]]
+    """
+    
+    def apply(self, expr, evaluation):
+        'QuantityMagnitude[expr_]'
+        
+        def get_magnitude(leaves):
+            if len(leaves) == 1:
+                return 1
+            else:
+                return leaves[0]
+            
+        if QuantityQ(expr).evaluate(evaluation) == Symbol('True'):
+            print("true")
+            return get_magnitude(expr.leaves)
+        else:
+            evaluation.message('Quantity', 'unkunit', get_magnitude(expr.leaves) )
