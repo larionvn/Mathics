@@ -162,8 +162,14 @@ iso639_3 = {
     'Zulu': 'zul',
 }
 
-unit_short_term = {
-    'Meters':'m',
-    "Centimeters":'cm',
-    'Kilogram':'kg',
-    }
+valid_canonical_unit = [
+    'meters', 'm', 'meter',
+    "centimeters", 'cm', 'centi', 'centimeter',
+    "mega",
+    'kilogram','kg', 'kilograms',
+    'feet',
+    'siemens',
+    'seconds',
+    "miles",
+    
+    ]
